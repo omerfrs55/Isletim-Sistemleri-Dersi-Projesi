@@ -4,10 +4,10 @@ from collections import deque
 import matplotlib.pyplot as plt
 import numpy as np
 
-# =============================================================================
-# PROJE: İŞLETİM SİSTEMLERİ SİMÜLASYONU (Tam Açıklamalı Versiyon)
+
+# PROJE: İŞLETİM SİSTEMLERİ SİMÜLASYONU
 # Amaç: MLFQ, RR ve SRTF algoritmalarını karşılaştırarak performans analizi yapmak.
-# =============================================================================
+
 
 class Process:
     """
@@ -53,12 +53,12 @@ def print_dashboard_row(time, pid, queue, rem, detail):
     print(f"║ {time:<6} ║ P{pid:<3} ║ {q_str:<10} ║ {rem:<6} ║ {detail:<55} ║")
 
 def print_dashboard_footer():
-    # Tablonun alt çizgisini kapat
+    # Tablonun alt çizgisini kapatmak için
     print("╚" + "═"*8 + "╩" + "═"*6 + "╩" + "═"*12 + "╩" + "═"*8 + "╩" + "═"*57 + "╝")
 
-# =============================================================================
+
 # SENARYO VERİLERİ (DATA GENERATOR)
-# =============================================================================
+
 def get_scenario_data(choice):
     """
     Kullanıcının seçtiği numaraya göre farklı test verileri döndürür.
@@ -81,11 +81,11 @@ def get_scenario_data(choice):
         return [(1, 0, 30), (2, 2, 2), (3, 4, 2), (4, 6, 2), (5, 8, 2)], "Stres ve Kesinti (Preemption) Testi"
     return [], "Bilinmeyen"
 
-# =============================================================================
+
 # ALGORİTMA 1: MLFQ (Multi-Level Feedback Queue)
-# =============================================================================
+
 def run_mlfq(processes, verbose=True):
-    # Eğer detaylı mod (verbose) açıks, tablo başlığını yazdır
+    # Eğer detaylı mod (verbose) açıksa, tablo başlığını yazdır
     if verbose: print_dashboard_header("MLFQ SİMÜLASYONU (Dinamik Öncelik)")
     
     current_time = 0        # Simülasyon saati (0'dan başlar)
@@ -96,18 +96,18 @@ def run_mlfq(processes, verbose=True):
     q1 = deque() # Orta öncelik (Quantum = 4sn)
     q2 = deque() # En düşük öncelik (FCFS) - Uzun süre çalışanlar buraya düşer
     
-    threshold_heavy = 10    # Hocanın istediği kural: 10sn çalışan "ağır iş" sayılır
+    threshold_heavy = 10    # 10sn çalışan "ağır iş" sayılır
 
     # Tüm işlemler bitene kadar döngü devam eder
     while len(completed) < len(processes):
         
-        # 1. ADIM: Sisteme yeni giren süreç var mı kontrol et
+        # Sisteme yeni giren süreç var mı kontrol et
         for p in processes:
             if p.arrival_time == current_time: # Şu anki saniyede gelen iş var mı?
                 q0.append(p)                   # Varsa en yüksek önceliğe (Q0) ekle
                 if verbose: print_dashboard_row(current_time, p.pid, "0 (VIP)", p.remaining_time, "--> Sisteme giriş yaptı (Yüksek Öncelik).")
 
-        # 2. ADIM: Hangi işi çalıştıracağız? (Öncelik kontrolü)
+        # Hangi işi çalıştıracağız? (Öncelik kontrolü)
         active = None
         source_q = -1
         
@@ -123,13 +123,13 @@ def run_mlfq(processes, verbose=True):
                 active.start_time = current_time
                 active.response_time = current_time - active.arrival_time
 
-            # 3. ADIM: İşlemciyi 1 birim zaman çalıştır
+            # İşlemciyi 1 birim zaman çalıştır
             active.remaining_time -= 1      # Kalan iş süresini azalt
             active.total_executed += 1      # Toplam çalışma süresini artır
             active.time_in_queue += 1       # Bu kuyrukta harcadığı süreyi artır
             current_time += 1               # Zamanı ilerlet
             
-            # 4. ADIM: İş bitti mi kontrolü
+            # İş bitti mi kontrolü
             if active.remaining_time == 0:
                 # İstatistikleri hesapla
                 active.completion_time = current_time
@@ -138,25 +138,25 @@ def run_mlfq(processes, verbose=True):
                 completed.append(active) # Bitenlere ekle
                 if verbose: print_dashboard_row(current_time, active.pid, "Bitti", 0, "*** İşlem tamamlandı ve sistemden çıktı.")
             
-            # İş bitmediyse kuralları uygula (Feedback Mekanizması)
+            # İş bitmediyse kuralları uygula (Feedback Mekanizmamız)
             else:
-                # KURAL A: 10 saniye kuralı (Hocanın özel isteği)
+                # 10 saniye kuralı
                 # Eğer iş toplamda 10sn çalıştıysa ve henüz en altta değilse, en alta at.
                 if active.total_executed >= threshold_heavy and source_q != 2:
                     if verbose: print_dashboard_row(current_time, active.pid, f"Q{source_q}->Q2", active.remaining_time, "CEZA: 10sn kotası doldu, en alta düşürüldü.")
                     active.time_in_queue = 0 # Yeni kuyruk için sayacı sıfırla
                     q2.append(active)        # Q2'ye sürgün et
                 
-                # KURAL B: Q0'daysa ve 2 saniyelik hakkını (Quantum) doldurduysa
+                # Q0'daysa ve 2 saniyelik hakkını (Quantum) doldurduysa
                 elif source_q == 0:
                     if active.time_in_queue >= 2:
                         if verbose: print_dashboard_row(current_time, active.pid, "Q0->Q1", active.remaining_time, "Süre (2sn) bitti, öncelik düşürüldü.")
                         active.time_in_queue = 0
                         q1.append(active)    # Bir alt kuyruğa (Q1) düşür
                     else:
-                        q0.appendleft(active) # Süresi dolmadıysa, Q0'ın başına geri koy (Preemption için)
+                        q0.appendleft(active) # Süresi dolmadıysa, Q0'ın başına geri koy
                 
-                # KURAL C: Q1'deyse ve 4 saniyelik hakkını doldurduysa
+                # Q1'deyse ve 4 saniyelik hakkını doldurduysa
                 elif source_q == 1:
                     if active.time_in_queue >= 4:
                         if verbose: print_dashboard_row(current_time, active.pid, "Q1->Q2", active.remaining_time, "Süre (4sn) bitti, Q2'ye aktarıldı.")
@@ -165,9 +165,9 @@ def run_mlfq(processes, verbose=True):
                     else:
                         q1.appendleft(active) # Süresi dolmadıysa devam et
                 
-                # KURAL D: Q2'deyse (Round Robin / FCFS mantığı)
+                # Q2'deyse (Round Robin / FCFS mantığı)
                 elif source_q == 2:
-                    q2.appendleft(active)    # Kesilmediği sürece çalışmaya devam etsin (veya RR için append ile sona atılabilir)
+                    q2.appendleft(active)    # Kesilmediği sürece çalışmaya devam etsin
         
         else:
             # Hiçbir kuyrukta iş yoksa işlemci boştadır
@@ -177,9 +177,8 @@ def run_mlfq(processes, verbose=True):
     if verbose: print_dashboard_footer()
     return completed
 
-# =============================================================================
 # ALGORİTMA 2: ROUND ROBIN (RR)
-# =============================================================================
+
 def run_rr(processes, quantum=4, verbose=True):
     if verbose: print_dashboard_header(f"ROUND ROBIN SİMÜLASYONU (Sabit Quantum={quantum})")
     
@@ -213,14 +212,14 @@ def run_rr(processes, quantum=4, verbose=True):
                 current_time += 1
                 exec_time += 1
                 
-                # ÖNEMLİ: İşlemci çalışırken o arada yeni bir iş gelirse onu kuyruğa almalıyız
+                # İşlemci çalışırken o arada yeni bir iş gelirse onu kuyruğa almalıyız
                 for new_p in processes:
                     if new_p.arrival_time == current_time and new_p.pid not in p_in_queue and new_p not in completed:
                         queue.append(new_p)
                         p_in_queue.add(new_p.pid)
                         if verbose: print_dashboard_row(current_time, new_p.pid, "Kuyruk", new_p.remaining_time, "Yeni işlem geldi, sıranın sonuna eklendi.")
 
-            # Döngüden çıkınca kontrol et: İş bitti mi?
+            # Döngüden çıkınca kontrol et iş bitti mi?
             if p.remaining_time == 0:
                 p.completion_time = current_time
                 p.turnaround_time = p.completion_time - p.arrival_time
@@ -239,9 +238,9 @@ def run_rr(processes, quantum=4, verbose=True):
     if verbose: print_dashboard_footer()
     return completed
 
-# =============================================================================
+
 # ALGORİTMA 3: SRTF (Shortest Remaining Time First) - Benchmark
-# =============================================================================
+
 def run_srtf(processes, verbose=True):
     if verbose: print_dashboard_header("SRTF (TEORİK REFERANS) SİMÜLASYONU")
     
@@ -254,7 +253,7 @@ def run_srtf(processes, verbose=True):
         available = [p for p in processes if p.arrival_time <= current_time and p.remaining_time > 0]
         
         if available:
-            # EN ÖNEMLİ SATIR: Kalan süresi en az olanı seç (SRTF Mantığı)
+            # Kalan süresi en az olanı seç (SRTF Mantığı)
             shortest = min(available, key=lambda x: x.remaining_time)
             
             # İlk başlama zamanı kaydı
@@ -286,9 +285,8 @@ def run_srtf(processes, verbose=True):
     if verbose: print_dashboard_footer()
     return completed
 
-# =============================================================================
-# DETAYLI ANALİZ MODÜLÜ (Otomatik Yorumlama Yapan Kısım)
-# =============================================================================
+# DETAYLI ANALİZ MODÜLÜM
+
 def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     # Başlık Yazdırma
     print("\n")
@@ -296,7 +294,7 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     print(f"┃ {'PERFORMANS ANALİZ VE SONUÇ RAPORU: ' + scenario_name:^88} ┃")
     print("┗" + "━"*90 + "┛")
     
-    # Verileri PID sırasına diz (Karşılaştırma doğru olsun diye)
+    # Verileri PID sırasına diz (Karşılaştırmamız doğru olsun diye)
     mlfq_res.sort(key=lambda x: x.pid)
     rr_res.sort(key=lambda x: x.pid)
     srtf_res.sort(key=lambda x: x.pid)
@@ -322,9 +320,9 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     r_resp = sum(p.response_time for p in rr_res) / len(rr_res)
     s_resp = sum(p.response_time for p in srtf_res) / len(srtf_res)
 
-    # --- DİNAMİK YORUM MANTIĞI (Rakamlara Göre Cümle Kurma) ---
+    # DİNAMİK YORUM MANTIĞI (Rakamlara Göre Cümle Kurma) 
     
-    # A) Kısa İşler Performansı
+    # Kısa İşler Performansı
     if r_short > 0:
         gain_short = ((r_short - m_short) / r_short * 100) # İyileşme yüzdesi
     else: gain_short = 0
@@ -336,7 +334,7 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     else:
         perf_comment = f"Bu senaryoda Round Robin, MLFQ'ya göre daha iyi sonuç vermiştir (Nadir durum)."
 
-    # B) Screen Time (Tepki Süresi) Performansı
+    # Screen Time (Tepki Süresi) Performansı
     if r_resp > 0:
         gain_resp = ((r_resp - m_resp) / r_resp * 100)
     else: gain_resp = 0
@@ -346,14 +344,14 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     else:
         resp_comment = "Tepki süresi her iki algoritmada da benzer seviyededir."
 
-    # C) Trade-off Analizi (Uzun İşler Zarar Gördü mü?)
+    # Trade-off Analizi (Uzun İşler Zarar Gördü mü?)
     if long_jobs:
         loss_long = m_long - r_long
         trade_comment = f"Kısa işlere yer açmak için, uzun işler MLFQ'da ortalama {loss_long:.2f} sn daha fazla beklemiştir (Trade-off)."
     else:
         trade_comment = "Senaryoda çok uzun süreli iş bulunmadığı için negatif bir ödünleşim (trade-off) oluşmamıştır."
 
-    # --- ANALİZ TABLOSUNU YAZDIRMA ---
+    # ANALİZ TABLOSUNU YAZDIRMA
     print(f"{'METRİK':<35} | {'MLFQ (Önerilen)':<18} | {'RR (Standart)':<18} | {'SRTF (Referans)':<15}")
     print("-" * 92)
     # Ortalamalar
@@ -367,7 +365,7 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     print(f"{'Tepki Süresi / Screen Time (Sn)':<35} | {m_resp:<18.2f} | {r_resp:<18.2f} | {s_resp:<15.2f}")
     print("-" * 92)
 
-    # --- SÖZEL DEĞERLENDİRME ---
+    # SÖZEL DEĞERLENDİRMEMİZ
     print("\n>>> SİMÜLASYON DEĞERLENDİRMESİ")
     print(f"1. PERFORMANS: {perf_comment}")
     print(f"2. DENEYİM: {resp_comment}")
@@ -377,10 +375,10 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     # Grafik iste
     ask_graph([mlfq_res, rr_res, srtf_res], scenario_name)
 
-# =============================================================================
+
 # BENCHMARK MODU (TÜM SENARYOLAR)
-# Bu fonksiyon tüm senaryoları sırayla çalıştırıp özet bir karne çıkarır.
-# =============================================================================
+# Bu fonksiyonumuzda tüm senaryoları sırayla çalıştırıp özet bir karne çıkartırız.
+
 def compare_all_benchmarks():
     print("\n" + "░"*90)
     print(f"{'GENEL KARŞILAŞTIRMA (BENCHMARK SUITE)':^90}")
@@ -390,7 +388,7 @@ def compare_all_benchmarks():
     # 4 Senaryoyu döngü ile çalıştır
     for i in range(1, 5):
         raw, name = get_scenario_data(i)
-        # Veri kopyalama (önemli)
+        # Veri kopyalama
         d1=[Process(p,a,b) for p,a,b in raw]; d2=copy.deepcopy(d1)
         # Sessiz modda (False) çalıştır, sadece sonuç al
         r1=run_mlfq(d1, False); r2=run_rr(d2, 4, False)
@@ -399,7 +397,7 @@ def compare_all_benchmarks():
         results.append((name, w1, w2))
         print(f">> {name} simülasyonu tamamlandı.")
 
-    # Özet Tablo
+    # Özet Tablom
     print("\n" + "═"*90)
     print(f"{'SENARYO TİPİ':<45} | {'MLFQ (Wait)':<15} | {'RR (Wait)':<15} | {'DURUM'}")
     print("-" * 90)
@@ -419,9 +417,9 @@ def compare_all_benchmarks():
 
     ask_graph_summary(results)
 
-# =============================================================================
+
 # GRAFİK ÇİZİM FONKSİYONLARI (Matplotlib)
-# =============================================================================
+
 def ask_graph(results, title):
     if input("\nGrafikleri görüntülemek için 'E' tuşuna basın: ").lower() == 'e':
         m, r, s = results
@@ -429,13 +427,13 @@ def ask_graph(results, title):
         x = np.arange(len(pids)); w = 0.25
         fig, ax = plt.subplots(1, 2, figsize=(12, 5))
         
-        # Grafik 1: Bekleme Süreleri
+        # Grafik 1: Bekleme Sürelerimiz
         ax[0].bar(x-w, [p.wait_time for p in m], w, color='#2ecc71', label='MLFQ')
         ax[0].bar(x, [p.wait_time for p in r], w, color='#e74c3c', label='RR')
         ax[0].bar(x+w, [p.wait_time for p in s], w, color='#95a5a6', alpha=0.5, label='SRTF')
         ax[0].set_title(f"{title}\nBekleme Süresi"); ax[0].set_xticks(x); ax[0].set_xticklabels(pids); ax[0].legend()
         
-        # Grafik 2: Tepki Süreleri
+        # Grafik 2: Tepki Sürelerimiz
         ax[1].bar(x-w/2, [p.response_time for p in m], w, color='#f1c40f', label='MLFQ')
         ax[1].bar(x+w/2, [p.response_time for p in r], w, color='#8e44ad', label='RR')
         ax[1].set_title(f"{title}\nTepki Süresi"); ax[1].set_xticks(x); ax[1].set_xticklabels(pids); ax[1].legend()
@@ -451,9 +449,8 @@ def ask_graph_summary(results):
         ax.set_title("Tüm Senaryoların Karşılaştırması"); ax.set_xticks(x); ax.set_xticklabels(labels); ax.legend()
         plt.show()
 
-# =============================================================================
-# ANA PROGRAM (MENÜ)
-# =============================================================================
+# MENÜ
+
 if __name__ == "__main__":
     while True:
         print("\n" + "█"*60)
