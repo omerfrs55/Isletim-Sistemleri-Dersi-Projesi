@@ -3,9 +3,9 @@ import copy
 from collections import deque
 import matplotlib.pyplot as plt
 import numpy as np
+import random  # Veri üretimi için eklendi
 
-
-# PROJE: İŞLETİM SİSTEMLERİ SİMÜLASYONU
+# Dinamik Öncelikli Hibrit Tarife (MLFQ)
 # Amaç: MLFQ, RR ve SRTF algoritmalarını karşılaştırarak performans analizi yapmak.
 
 
@@ -20,14 +20,14 @@ class Process:
         self.burst_time = burst_time    # İşin tamamlanması için gereken toplam CPU süresi
         self.remaining_time = burst_time # Simülasyon anında geriye kalan iş süresi (Azalacak)
         
-        # --- Performans Analizi İçin Tutulan İstatistikler ---
+        # Performans Analizi İçin Tutulan İstatistikler
         self.start_time = -1            # CPU'yu ilk kez ne zaman aldı? (Tepki süresi için)
         self.completion_time = 0        # İş ne zaman tamamen bitti?
         self.wait_time = 0              # Kuyrukta işlemci beklerken geçirdiği toplam süre
         self.turnaround_time = 0        # (Bitiş Zamanı - Geliş Zamanı) toplam sistemde kalma süresi
         self.response_time = 0          # (İlk Başlama - Geliş Zamanı) ekrana ilk tepki süresi
         
-        # --- MLFQ Algoritmasına Özel Sayaçlar ---
+        # MLFQ Algoritmasına Özel Sayaçlar
         self.total_executed = 0         # Bu süreç toplamda kaç saniye CPU kullandı? (Ceza kontrolü için)
         self.time_in_queue = 0          # Şu anki bulunduğu kuyrukta ne kadar süredir çalışıyor? (Quantum için)
         self.in_queue = False           # Kod tekrarı olmasın diye kuyrukta olup olmadığını takip eder
@@ -36,7 +36,7 @@ class Process:
         # Çıktılarda nesne adresi yerine "P1", "P2" yazması için
         return f"P{self.pid}"
 
-# --- GÖRSEL YARDIMCI: TERMİNAL TABLO TASARIMI ---
+# GÖRSEL YARDIMCI: TERMİNAL TABLO TASARIMI
 # Bu fonksiyonlar hesaplama yapmaz, sadece terminal çıktısının güzel görünmesini sağlar.
 def print_dashboard_header(title):
     print("\n" + "╔" + "═"*95 + "╗") # Üst çerçeve
@@ -64,21 +64,55 @@ def get_scenario_data(choice):
     Kullanıcının seçtiği numaraya göre farklı test verileri döndürür.
     Amaç: Algoritmayı tek bir duruma göre değil, her ihtimale göre test etmektir.
     """
+    data = []
+    # Veri sayısını 1000'e çıkardık
+    count = 1000 
+    
     if choice == 1:
         # Karma Senaryo: Kısa, uzun ve orta işlerin karışık olduğu dengeli test.
-        return [(1, 0, 5), (2, 0, 22), (3, 2, 2), (4, 6, 4)], "Karma (Standart) Senaryo"
+        # 1000 veri için rastgele dağılım yapıyoruz.
+        for i in range(1, count + 1):
+            arrival = random.randint(0, 500) # Geliş zamanı dağınık
+            burst = random.randint(1, 30)    # 1 ile 30 arası karışık süreler
+            data.append((i, arrival, burst))
+        return data, "Karma (Standart) Senaryo - 1000 Veri"
+        
     elif choice == 2:
         # Etkileşimli Senaryo: Genelde kısa süren işler (Mouse hareketi, klavye girdisi gibi).
         # MLFQ burada çok başarılı olmalı.
-        return [(1, 0, 2), (2, 1, 3), (3, 2, 1), (4, 3, 2), (5, 0, 12)], "Etkileşimli (Kısa İş) Senaryosu"
+        for i in range(1, count + 1):
+            arrival = random.randint(0, 500)
+            # %90 ihtimalle kısa iş (1-4 sn), %10 ihtimalle uzun iş
+            if random.random() < 0.9:
+                burst = random.randint(1, 4)
+            else:
+                burst = random.randint(10, 20)
+            data.append((i, arrival, burst))
+        return data, "Etkileşimli (Kısa İş) Senaryosu - 1000 Veri"
+        
     elif choice == 3:
         # Ağır Yük Senaryosu: Tüm işler çok uzun. (Video render, bilimsel hesaplama).
         # MLFQ burada Round Robin'e dönüşmeli.
-        return [(1, 0, 15), (2, 0, 18), (3, 2, 20), (4, 5, 12)], "Ağır Yük (CPU Bound) Senaryosu"
+        for i in range(1, count + 1):
+            arrival = random.randint(0, 200) # İşler hızlıca sisteme yağıyor
+            burst = random.randint(15, 50)   # Hepsi uzun sürüyor (10sn üzeri)
+            data.append((i, arrival, burst))
+        return data, "Ağır Yük (CPU Bound) Senaryosu - 1000 Veri"
+        
     elif choice == 4:
         # Stres Testi: Uzun bir iş çalışırken sürekli araya giren kısa işler (Kesinti/Preemption).
         # MLFQ'nun hızlı tepki yeteneğini ölçer.
-        return [(1, 0, 30), (2, 2, 2), (3, 4, 2), (4, 6, 2), (5, 8, 2)], "Stres ve Kesinti (Preemption) Testi"
+        # İlk 10 iş çok uzun, geri kalan 990 iş çok kısa ve sık aralıklarla geliyor
+        for i in range(1, 11):
+            data.append((i, 0, 200)) # Çok uzun işler başta
+        
+        for i in range(11, count + 1):
+            arrival = random.randint(1, 1000) # Sürekli geliyorlar
+            burst = random.randint(1, 3)      # Çok kısalar
+            data.append((i, arrival, burst))
+            
+        return data, "Stres ve Kesinti (Preemption) Testi - 1000 Veri"
+        
     return [], "Bilinmeyen"
 
 
@@ -347,7 +381,7 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     # Trade-off Analizi (Uzun İşler Zarar Gördü mü?)
     if long_jobs:
         loss_long = m_long - r_long
-        trade_comment = f"Kısa işlere yer açmak için, uzun işler MLFQ'da ortalama {loss_long:.2f} sn daha fazla beklemiştir (Trade-off)."
+        trade_comment = f"Kısa işlere yer açmak için, uzun işler MLFQ'da ortalama {loss_long:.2f} ms daha fazla beklemiştir (Trade-off)."
     else:
         trade_comment = "Senaryoda çok uzun süreli iş bulunmadığı için negatif bir ödünleşim (trade-off) oluşmamıştır."
 
@@ -355,14 +389,14 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     print(f"{'METRİK':<35} | {'MLFQ (Önerilen)':<18} | {'RR (Standart)':<18} | {'SRTF (Referans)':<15}")
     print("-" * 92)
     # Ortalamalar
-    print(f"{'Ortalama Bekleme (Sn)':<35} | {m_avg:<18.2f} | {r_avg:<18.2f} | {s_avg:<15.2f}")
+    print(f"{'Ortalama Bekleme (ms)':<35} | {m_avg:<18.2f} | {r_avg:<18.2f} | {s_avg:<15.2f}")
     # Kısa İşler Detayı
-    print(f"{'Kısa İşler Bekleme (Sn)':<35} | {m_short:<18.2f} | {r_short:<18.2f} | {s_short:<15.2f}")
+    print(f"{'Kısa İşler Bekleme (ms)':<35} | {m_short:<18.2f} | {r_short:<18.2f} | {s_short:<15.2f}")
     # Uzun İşler Detayı (Varsa yaz, yoksa tire koy)
     if long_jobs:
-        print(f"{'Uzun İşler Bekleme (Sn)':<35} | {m_long:<18.2f} | {r_long:<18.2f} | {'-':<15}")
+        print(f"{'Uzun İşler Bekleme (ms)':<35} | {m_long:<18.2f} | {r_long:<18.2f} | {'-':<15}")
     # Screen Time Detayı
-    print(f"{'Tepki Süresi / Screen Time (Sn)':<35} | {m_resp:<18.2f} | {r_resp:<18.2f} | {s_resp:<15.2f}")
+    print(f"{'Tepki Süresi / Screen Time (ms)':<35} | {m_resp:<18.2f} | {r_resp:<18.2f} | {s_resp:<15.2f}")
     print("-" * 92)
 
     # SÖZEL DEĞERLENDİRMEMİZ
@@ -370,7 +404,7 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
     print(f"1. PERFORMANS: {perf_comment}")
     print(f"2. DENEYİM: {resp_comment}")
     print(f"3. TRADE-OFF: {trade_comment}")
-    print(f"4. BENCHMARK: Geliştirilen algoritma, teorik limit olan SRTF'ye {abs(m_avg - s_avg):.2f} saniye yaklaşmıştır.")
+    print(f"4. BENCHMARK: Geliştirilen algoritma, teorik limit olan SRTF'ye {abs(m_avg - s_avg):.2f} ms yaklaşmıştır.")
     
     # Grafik iste
     ask_graph([mlfq_res, rr_res, srtf_res], scenario_name)
@@ -381,15 +415,16 @@ def analyze_detailed(mlfq_res, rr_res, srtf_res, scenario_name):
 
 def compare_all_benchmarks():
     print("\n" + "░"*90)
-    print(f"{'GENEL KARŞILAŞTIRMA (BENCHMARK SUITE)':^90}")
+    print(f"{'GENEL KARŞILAŞTIRMA (BENCHMARK SUITE - 1000 Veri)':^90}")
     print("░"*90 + "\n")
+    print("NOT: 1000 veri işleniyor, lütfen bekleyin...\n")
     
     results = []
     # 4 Senaryoyu döngü ile çalıştır
     for i in range(1, 5):
         raw, name = get_scenario_data(i)
         # Veri kopyalama
-        d1=[Process(p,a,b) for p,a,b in raw]; d2=copy.deepcopy(d1)
+        d1=[Process(p,a,b) for p,a,b in raw]; d2=copy.deepcopy(d1); d3=copy.deepcopy(d1)
         # Sessiz modda (False) çalıştır, sadece sonuç al
         r1=run_mlfq(d1, False); r2=run_rr(d2, 4, False)
         # Ortalamaları hesapla
@@ -421,23 +456,99 @@ def compare_all_benchmarks():
 # GRAFİK ÇİZİM FONKSİYONLARI (Matplotlib)
 
 def ask_graph(results, title):
+    """
+    1000 veri için optimize edilmiş Hız ve Kararlılık grafikleri.
+    Düzenleme: Alt açıklama metni grafikten ayrıldı, etiketler düzeltildi.
+    """
     if input("\nGrafikleri görüntülemek için 'E' tuşuna basın: ").lower() == 'e':
-        m, r, s = results
-        pids = [f"P{p.pid}" for p in m]
-        x = np.arange(len(pids)); w = 0.25
-        fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+        m_list, r_list, s_list = results
         
-        # Grafik 1: Bekleme Sürelerimiz
-        ax[0].bar(x-w, [p.wait_time for p in m], w, color='#2ecc71', label='MLFQ')
-        ax[0].bar(x, [p.wait_time for p in r], w, color='#e74c3c', label='RR')
-        ax[0].bar(x+w, [p.wait_time for p in s], w, color='#95a5a6', alpha=0.5, label='SRTF')
-        ax[0].set_title(f"{title}\nBekleme Süresi"); ax[0].set_xticks(x); ax[0].set_xticklabels(pids); ax[0].legend()
+        # Grafik stili
+        plt.style.use('ggplot')
+        fig, ax = plt.subplots(1, 2, figsize=(16, 8)) # Yüksekliği biraz artırdım (7 -> 8)
         
-        # Grafik 2: Tepki Sürelerimiz
-        ax[1].bar(x-w/2, [p.response_time for p in m], w, color='#f1c40f', label='MLFQ')
-        ax[1].bar(x+w/2, [p.response_time for p in r], w, color='#8e44ad', label='RR')
-        ax[1].set_title(f"{title}\nTepki Süresi"); ax[1].set_xticks(x); ax[1].set_xticklabels(pids); ax[1].legend()
-        plt.tight_layout(); plt.show()
+        # ---------------------------------------------------------
+        # GRAFİK 1: GENEL HIZ KARŞILAŞTIRMASI (BAR CHART)
+        # ---------------------------------------------------------
+        
+        metrics = ['Ortalama Bekleme\n(Wait Time)', 'Ortalama Tepki\n(Response Time)', 'Ort. Sistemde Kalma\n(Turnaround)']
+        
+        def get_means(lst):
+            avg_wait = sum(p.wait_time for p in lst) / len(lst)
+            avg_resp = sum(p.response_time for p in lst) / len(lst)
+            avg_turn = sum(p.turnaround_time for p in lst) / len(lst)
+            return [avg_wait, avg_resp, avg_turn]
+
+        m_means = get_means(m_list)
+        r_means = get_means(r_list)
+        s_means = get_means(s_list)
+        
+        x = np.arange(len(metrics))
+        width = 0.25
+
+        # DÜZELTME 1: Etiket ismi güncellendi
+        rects1 = ax[0].bar(x - width, m_means, width, label='MLFQ (Önerilen)', color='#27ae60')
+        rects2 = ax[0].bar(x, r_means, width, label='Round Robin (Standart)', color='#c0392b')
+        rects3 = ax[0].bar(x + width, s_means, width, label='SRTF (Teorik Limit)', color='#7f8c8d', alpha=0.6)
+
+        ax[0].set_ylabel('Süre (Milisaniye)')
+        ax[0].set_title(f'{title}\nGENEL PERFORMANS ÖZETİ', fontweight='bold', fontsize=11)
+        ax[0].set_xticks(x)
+        ax[0].set_xticklabels(metrics)
+        ax[0].legend()
+        
+        # Sütun üstüne değer yazma
+        def autolabel(rects):
+            for rect in rects:
+                height = rect.get_height()
+                ax[0].annotate(f'{height:.0f}',
+                            xy=(rect.get_x() + rect.get_width() / 2, height),
+                            xytext=(0, 3),
+                            textcoords="offset points",
+                            ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        autolabel(rects1)
+        autolabel(rects2)
+
+        # ---------------------------------------------------------
+        # GRAFİK 2: KARARLILIK ANALİZİ (BOX PLOT)
+        # ---------------------------------------------------------
+        
+        data_to_plot = [
+            [p.wait_time for p in m_list],
+            [p.wait_time for p in r_list],
+            [p.wait_time for p in s_list]
+        ]
+        
+        bp = ax[1].boxplot(data_to_plot, patch_artist=True, labels=['MLFQ', 'Round Robin', 'SRTF'])
+        
+        colors = ['#2ecc71', '#e74c3c', '#95a5a6']
+        for patch, color in zip(bp['boxes'], colors):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.6)
+            
+        ax[1].set_title(f'{title}\nKARARLILIK ANALİZİ (Bekleme Süresi Dağılımı)', fontweight='bold', fontsize=11)
+        ax[1].set_ylabel('Bekleme Süresi (ms)')
+        ax[1].grid(True, linestyle='--', alpha=0.5)
+        
+        # ---------------------------------------------------------
+        # AÇIKLAMA METNİ VE AYARLAMALAR
+        # ---------------------------------------------------------
+        
+        stats_text = (
+            "GRAFİK OKUMA KILAVUZU:\n"
+            "► SOL GRAFİK (HIZ): Sütunlar ne kadar kısaysa o kadar iyidir (Daha az bekleme).\n"
+            "► SAĞ GRAFİK (KARARLILIK): Kutu ne kadar aşağıda ve kısaysa, algoritma o kadar istikrarlıdır.\n"
+            "   (Kutunun içindeki çizgi ortalama değeri gösterir.)"
+        )
+        
+        # Yazıyı ortala ve hafif yukarı al
+        plt.figtext(0.5, 0.02, stats_text, ha="center", fontsize=10, 
+                    bbox={"facecolor":"orange", "alpha":0.1, "pad":8})
+
+        # DÜZELTME 2: Alt boşluğu (bottom) 0.15 yaparak yazının grafiğe girmesini engelledik.
+        plt.tight_layout(rect=[0, 0.15, 1, 1]) 
+        plt.show()
 
 def ask_graph_summary(results):
     if input("\nÖzet grafiği görüntülemek için 'E' tuşuna basın: ").lower() == 'e':
@@ -446,7 +557,7 @@ def ask_graph_summary(results):
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.bar(x-w/2, [x[1] for x in results], w, label='MLFQ', color='green')
         ax.bar(x+w/2, [x[2] for x in results], w, label='RR', color='blue')
-        ax.set_title("Tüm Senaryoların Karşılaştırması"); ax.set_xticks(x); ax.set_xticklabels(labels); ax.legend()
+        ax.set_title("Tüm Senaryoların Karşılaştırması (1000 Veri)"); ax.set_xticks(x); ax.set_xticklabels(labels); ax.legend()
         plt.show()
 
 # MENÜ
@@ -454,7 +565,7 @@ def ask_graph_summary(results):
 if __name__ == "__main__":
     while True:
         print("\n" + "█"*60)
-        print(f"{'SÜREÇ ÇİZELGELEME TEST LABORATUVARI (v9.1)':^60}")
+        print(f"{'SÜREÇ ÇİZELGELEME TEST LABORATUVARI (1000 Veri)':^60}")
         print("█"*60)
         print("1. Standart Senaryo (Dengeli)")
         print("2. Etkileşimli Senaryo (Kısa İşler)")
@@ -469,11 +580,18 @@ if __name__ == "__main__":
             if choice == 5: compare_all_benchmarks()
             elif 1 <= choice <= 4:
                 raw, name = get_scenario_data(choice)
+                
+                # 1000 veri için log uyarısı
+                print(f"\n[SİSTEM UYARISI] {len(raw)} adet veri işlenecek.")
+                print("Detaylı logları açmak terminali yavaşlatabilir.")
+                v_inp = input("Detaylı logları (Her adımı) görmek ister misiniz? (E/H): ").lower()
+                is_verbose = True if v_inp == 'e' else False
+                
                 # Her algoritma için temiz veri kopyası oluştur
                 d1=[Process(p,a,b) for p,a,b in raw]; d2=copy.deepcopy(d1); d3=copy.deepcopy(d1)
                 
                 # Algoritmaları çalıştır
-                r1=run_mlfq(d1); r2=run_rr(d2); r3=run_srtf(d3)
+                r1=run_mlfq(d1, is_verbose); r2=run_rr(d2, 4, is_verbose); r3=run_srtf(d3, is_verbose)
                 
                 # Sonuçları analiz et
                 analyze_detailed(r1, r2, r3, name)
